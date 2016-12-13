@@ -6,68 +6,360 @@
 
 \usepackage[final]{graphicx}
 
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+
+\usepackage[parfill]{parskip}
+
+
+\SetKwFor{Loop}{repeat}{}{end}
 
 \begin{document}
 
-\title{Your Title Here}
+\title{The Simplex Algorithm}
 
-\author{Your Name}
+\author{Aven Bross}
 
 \date{\today}
 
 \maketitle
 
-\section{Introduction}  PUT CONTENT HERE; PERHAPS CITE SOMETHING \cite{einstein}
+\textbf{Note:} I wrote quite a lot since I read a lot and I took a while to fully
+understand the algorithm. There is a lot I wrote that I realize is too much work to
+implement, my current plan is to first get an implementation of Simplex fully working,
+next test some simple examples, then get the Phase I starting point algorithm
+working. If I get all that done easily somehow, I will go from there. Sorry for
+how much text I put into this draft.
+
+\section{Introduction}
+
+Constrained optimization problems where both the objective and constraint
+functions are linear are known as \emph{linear programs}. All linear programs
+may be formulated in \emph{standard form},
+\[
+	\min_{x\in\mathbb{R}^n} c^Tx, \text{ such that } Ax=b \text{, } x\ge 0,
+\]
+with $c\in\mathbb{R}^n$, $b\in\mathbb{R}^m$, $A\in\mathbb{R}^{m\times n}$,
+and $m<n$.
+The Simplex algorithm developed by George Dantzig around 1950 is a method of
+solving linear programming problems by considering only the vertices of the
+feasible polytope, points known as \emph{basic feasible points}.
+
+The main objective of this project is to develop an implementation of the
+Simplex algorithm using the ideas presented in sections 13.1-13.5 of Nocedal and
+Wright's book \cite{nocedalwright}. We will then apply Simplex to solve several
+problems we will formulate as linear programs.
 
 %\begin{figure}
 %\includegraphics[width=0.5\textwidth]{foo.png}  % put image "foo.png" in current directory
 %\caption{CAPTION TEXT HERE}
 %\end{figure}
 
-\section{Algorithms [or Examples]}  PUT CONTENT HERE; PERHAPS CITE SOMETHING \cite{nocedalwright}
+\section{Algorithms}
 
-\section{Examples [or Algorithms]}  PUT CONTENT HERE
+Suppose we have a linear program as defined in the introduction. We will denote
+the $i$th column of the matrix $A$ by $A_i$. We say $x\in\mathbb{R}^n$ is a
+basic feasible point if there
+exists $\mathcal{B}\subseteq\{1,2,\ldots,n\}$,
+with $\mathcal{N}=\{1,2,\ldots,n\}\setminus\mathcal{B}$, such that $|\mathcal{B}|=m$,
+$x_i=0$ for all $i\in\mathcal{N}$, and $B=[A_i]_{i\in\mathcal{B}}$,
+$B\in\mathbb{R}^{m\times m}$, is nonsingular. We call $\mathcal{B}$ a basis and
+$B$ the basis matrix. We will also use the matrix $N=[A_i]_{i\in\mathcal{N}}$,
+$N\in\mathbb{R}^{m\times(n-m)}$.
 
-\section{Implementation}  PUT CONTENT HERE
+The Simplex algorithm works by traversing the basic feasible points of a
+linear program. Thinking geometrically this has been proven to be equivalent to
+traversing the the vertices of the polytope of the feasible region formed by the
+constraints $Ax=b$, $x\ge 0$. I plan to implement this procedure, as well as
+try some problems where I can easily pre-compute basic feasible points and
+construct a basis.
 
-\bigskip
-\hrule
-\begin{verbatim}
-% MYCODE  This is my matlab implementation
-x = 1:10;
-y = randn(size(x));
-plot(x,y)
-z = 2+2
-\end{verbatim}
-\hrule
-\bigskip
+\textbf{Theorem 13.3} \cite{nocedalwright} All basic feasible points are
+vertices of the feasible polytope.
 
-MORE CONTENT PERHAPS
+Convergence criteria and correctness concerns will be discussed in the analysis
+section.
 
-\bigskip
-\hrule
-\begin{verbatim}
->> mycode             % here I am running the code
-z = 4
-\end{verbatim}
-\hrule
+We will now present pseudo-code for the core of the Simplex algorithm.
+Useful but quirky notation adapted from Nocedal and Wright's book is that for $v\in\mathbb{R}^n$ we use
+$v_B$ and $v_N$ denote the vectors consisting of the indices of $v$ from
+$\mathcal{B}$ and $\mathcal{N}$ respectively. That is
+$v_B=(v_{i_1},\ldots,v_{i_m})^T$ with $i_i\le\ldots\le i_n\in\mathcal{B}$, and
+similarly for $v_N$.
 
-\section{Results}  PUT CONTENT HERE
+The vectors $\lambda\in\mathbb{R}^m$ and $s\in\mathbb{R}^n$ represent the
+Lagrange multipliers for the constraints at the point $x$. These are discussed
+in the analysis section, but the goal is to produce a point $x$ with basis $B$
+such that $s_B\ge 0$. If this condition is not true Simplex selects some
+$q\in \mathcal{B}$ such that $s_q<0$ and proceeds to move along the polytope
+to reduce this component of $c^Tx$. We compute the vectors $\lambda$ and $s$,
+as well as the component $q$ in lines 4 through 6. Line 7 checks whether we
+have reached the sufficient criteria for a local (and in fact global) minimum.
 
-\section{Analysis}  PUT CONTENT HERE
+We reduce $c^Tx$ along component $q$ by proceeding to the next
+basic feasible point in the direction $d=B^{-1}A_q$. This computation is done on
+line 9. We chose this direction due to result (13.24) \cite{nocedalwright} which
+states
+\[
+	c^T(x+x_q d) = c^Tx+s_qx_q^+,
+\]
+for some $x_q^+\in\mathbb{R}^+$. Since $s_q<0$ this step is a reduction in our
+objective function. Line 10 checks to see if direction $d\le 0$ as this would allow
+$x_q^+\rightarrow\infty$, and thus $c^Tx\rightarrow -\infty$, while $x_B-x_q^+d$
+still stays within the feasible region. This only occurs when the linear program
+is unbounded and has no minimizer.
 
-\section{Conclusion}  PUT CONTENT HERE
+\begin{algorithm}
+\LinesNumbered
+\DontPrintSemicolon
+\KwIn{initial point $x\in\mathbb{R}^n$, initial index sets $\mathcal{B}$,
+	$\mathcal{N}$,
+	objective $c\in\mathbb{R}^n$, constraints $A\in\mathbb{R}^{m\times n}$,
+	$b\in\mathbb{R}^m$}
+\Loop{}{
+	$B \longleftarrow [A_i]_{i\in\mathcal{B}}$\;
+	$N \longleftarrow [A_i]_{i\in\mathcal{N}}$\;
+	solve($B^T\lambda = c_B$)\;
+	$s_N \longleftarrow c_N-N^T\lambda$\;
+	$q \longleftarrow$ index of $\min_{i\in\mathcal{N}}s_i$\;
+	\If{$s_q \ge 0$}{
+		\textbf{done:} solution found\;
+	}
+	solve($Bd=A_q$)\;
+	\If{$d\le 0$}{
+		\textbf{error:} problem unbounded\;
+	}
+	$p \longleftarrow$ index of $\min_{j\in \mathcal{B}} x_j/d_j$\;
+	$x_q^+ \longleftarrow x_p/d_p$\;
+	$x_B \longleftarrow x_B - dx_q^+$\;
+	$x_q \longleftarrow x_q^+$\;
+	$\mathcal{B}\longleftarrow \mathcal{B}-\{p\}+\{q\}$\;
+	$\mathcal{N}\longleftarrow \mathcal{N}-\{q\}+\{p\}$\;
+}
+\caption{Simplex (very naive)}
+\end{algorithm}
+
+When we proceed in direction $-d$ we must
+reduce the other components of $x_B$ to maintain $Ax=b$. Simplex works
+by moving just far enough along $d$ that one component $x_p$ of $x_B$ is reduced
+to zero. This computation is made on lines 12 and 13 of our Simplex pseudo-code.
+Since each step produces a reduction in the objective function, we will never
+return to a past basic feasible point. Since there are a finite number of
+basic feasible points, bounded $\binom{n}{m}$ the number of square $m\times m$
+matrices we can construct, the algorithm must terminate eventually. 
+
+Note we cannot reduce
+components from $x_N$ as $x_N=0$ and we must maintain
+$x\ge 0$. A similar issue may occur when some $x_i=0$ for $i\in\mathcal{B}$.
+This case is known as a degenerate basis and results in the inability to move
+along the direction $d$ if $d_i>0$ for any $x_i=0$ since this would invalidate
+the $x\ge 0$ constraint. In the theory we suppose our linear program doesn't
+allow for degenerate basis. However, in practice degenerate basis can be dealt
+with by taking different, potentially non-descent steps and checking to make
+sure we do not cycle. 
+
+On lines 14 and 15 we compute a new $x_B$ such that $x_p=0$ and $x_q>0$. The on
+lines 16 and 17 we remove $p$
+from $\mathcal{B}$ and add $q$ to correctly
+represent the basis for our new $x_B$. We update $\mathcal{N}$ accordingly.
+
+Each iteration requires that we solve two linear systems, $B^T\lambda = c_b$ to
+and $Bd=A_q$. There are optimizations that can be made to maintain and update
+the $LU$ decomposition of $B$ as the rows in $B$ are swapped out. However, for
+simplifying the implementations and maintaining clarity of pseudo-code
+these optimizations are not included as of now. The optimizations may also
+cause numeric instability.
+
+\subsection{Starting Simplex}
+
+Just like most optimization algorithms, Simplex is iterative. It begins with an
+$x_0$ and produces $\{x_k\}$ that will converge upon a minimizer (although we
+seem to avoid this sequence notation with Simplex since there are enough
+subscripts already). Unlike other algorithms however, Simplex jumps between
+discrete points in the feasible space, the basic feasible points. In order to
+function we must be able to start the algorithm from a basic feasible point.
+This means before the algorithm even begins we must construct a point $x$ and
+a valid basis $\mathcal{B}$.
+
+Unfortunately, as noted on page 378 in Nocedal and Wright, this problem is often
+a linear programming problem in itself. The common strategy for solving this
+problem is to construct a Phase I linear program where we know a feasible point
+and a minimizer will produce a basic feasible point for the original linear
+program.
+
+\section{Examples}
+
+\subsection{Diet Problem}
+
+One of the earliest problems formatted as a linear program the diet problem
+poses the following problem \cite{steiglitz}:
+
+Suppose we have $n$ different foods and $m$ different nutrients. Let
+$b\in\mathbb{R}^m$ represent the number of nutrients required for a given time
+period. Let $x\in\mathbb{R}^n$ represent the number of units of each food
+purchased and consumed in the given time period with $c\in\mathbb{R}^n$ the cost
+per unit of each food.
+Finally, let $A\in\mathbb{R}^{m\times n}$ with $A_{i,j}$ representing the amount
+of nutrient $i$ in food $j$. We then solve the linear program
+\begin{align*}
+\min c^Tx\\
+Ax\ge b\\
+x\ge 0.
+\end{align*}
+To put this in standard form we add slack (surplus) variables $u\in\mathbb{R}^m$
+and solve
+\begin{align*}
+\min c^Tx\\
+Ax - u= b\\
+x\ge 0\\
+s\ge 0.
+\end{align*}
+This is in standard form as we may equivalently write the above as
+\[
+	A'=\left[A\quad\begin{array}{llll}-1 &0 &\ldots & 0\\
+							 0 & -1 & \ldots & 0\\
+							 \vdots & \vdots &\ddots & \vdots\\
+							 0 & 0 & \ldots & -1
+			  \end{array}\right]\in\mathbb{R}^{m\times (n+m)}
+\]
+and
+$x'=\begin{bmatrix}x\\s\end{bmatrix},c'=\begin{bmatrix}c\\0\end{bmatrix}
+\in\mathbb{R}^{n+m}$, then solve
+\begin{align*}
+\min c'^Tx'\\
+A'x'= b\\
+x'\ge 0.
+\end{align*}
+
+\subsection{Combinatorial Problems}
+
+One of the original ideas of the project was to use Simplex to solve
+combinatorial problems formulated as linear programs. This turns out to have
+many interesting problems and will certainly take a back seat until the main
+Simplex portion is done. However, I don't imagine it will be too much work to
+try a few simple examples.
+
+A combinatorial problem formulated as a linear program generally requires
+its solutions to be integers, as non-whole numbers don't work nicely with
+discrete structures such as graphs graphs. Simplex may be used to solve integer
+linear programs, but only guarantees integer solutions under strict conditions,
+described below.
+
+A square matrix with integer values is said to be \emph{unimodular} if its determinant
+is $1$ or $-1$. We say a matrix with integer values is \emph{totally unimodular}
+if all of its square, nonisingular submatrices are unimodular.
+
+\textbf{Theorem.} \cite{steiglitz} If we have
+a linear program in standard form then all the vertices are integer points if
+$A$ is totally unimodular.
+
+Therefore if we formulate an integer linear program such that $A$ is totally
+unimodular, the Simplex algorithm can solve it as a continuous problem and
+produce integer solutions. There are several problems known to be solvable this
+way including the graph problems of maximum flow and bipartite matching.
+
+There is also an interesting paper \cite{dantzig} I found on solving Traveling
+Salesman this way, but it is slow and there are no guarantees of always
+producing integral solutions.
+
+
+\section{Implementation}
+
+Understanding the algorithm took a long time, and unfortunately there is not
+any complete code to supply here. However, I do have a decent understanding of
+what needs to be done to implement Simplex. I plan to use C++ and Eigen to implement
+the algorithm and begin with the most basic, quite inefficient operations.
+
+I have read sections
+13.4 and 13.5 of Nocedal and Wright and there are numerous methods of optimizing
+the different steps in the algorithm which could all be interesting to implement
+should the basic implementation prove easy. It also seems a common technique in
+implementing Simplex is to combine all the information into a larger matrix
+called a Tableau, and then you may perform many of the operations "in place" on
+the Tableau.
+
+\section{Results}
+
+Here I will compare correctness results of my Simplex implementation with the built
+in implementations in Octave and Haskell's HMatrix, as it seems Eigen does not
+have a built in implementation of Simplex to compare to.
+
+We will also time and compare scaling as I increase the dimensions of simple to
+formulate problems such as the diet problem.
+
+If I attempt to implement any of the optimizations from sections 13.4, 13.5, or
+13.7 I will also compare and time them here.
+
+\section{Analysis}
+
+\subsection{Convergence of Simplex}
+
+Linear programming is a constrained optimization problem. In constrained
+optimization we wish to produce similar necessary and sufficient conditions as
+we did for unconstrained optimization. In unconstrained optimization, the
+necessary condition for a local minimizer $x^*$ was $\nabla f(x^*)=0$. In
+constrained optimization this fails to hold however, as there may be directions
+that do not into feasible regions. Instead we consider a function called the
+Lagrangian,
+\[
+	\mathcal{L}(x,\lambda)
+		=f(x-\sum_{i\in \mathcal{E}\cup\mathcal{I}}\lambda_ic_i(x).
+\]
+We call $\lambda$ the Lagrange vector.
+Theorem 12.1 states for first order necessary conditions that if $x^*$ is a local minimizer 
+there must exist $\lambda^*$ such that $\nabla\mathcal{L}(x^*,\lambda)=0$,
+among other conditions such as ensuring we satisfy constraints.
+
+In linear programming we break the
+Lagrange vector into two separate vectors, $\lambda$ for the $Ax=b$ constraints
+and $s$ for the $x\ge 0$ constraints. Therefore we may plug in our objective
+and constraint functions and formulate our linear programming Lagrangian
+as
+\[
+	\mathcal{L}(x,\lambda,s)=c^Tx-\lambda^T(Ax-b)-s^Tx.
+\]
+The first order necessary conditions for linear programming are as follows
+from (13.4) in Nocedal and Wright:
+\begin{align*}
+A^Ty+s &= c,\\
+Ax &= b,\\
+x &\ge 0,\\
+s &\ge 0,\\
+x_is_i = 0, i=1,2,\ldots,n.
+\end{align*}
+Basic feasible points and the simplex procedure were outlined in the Algorithms
+section above. The following Theorems of Nocedal and Wright justify the Simplex
+steps.
+
+\textbf{Theorem 13.2} \cite{nocedalwright} If the linear program's feasible
+region is nonempty then there is at least one feasible point. If the linear
+program has solutions then at least one solution is a basic feasible point.
+
+\textbf{Theorem 13.4} \cite{nocedalwright} If the linear program is bounded and
+nondegenerate then Simplex terminates at a solution that is a basic feasible
+point.
+
+\section{Conclusion}
+
+Simplex is a simple idea: "traverse the vertices of the polytope following edges
+that reduce the objective function." However, it requires some careful
+consideration of assumptions and understanding of what the linear algebra is
+actually doing to be able to implement it in code. Degenerate cases and numeric
+instability are potential pitfalls, but there are numerous methods that have
+been developed to get around these. I will discuss how this went here...
 
 \begin{thebibliography}{2}  % "2" because there are two references
-\bibitem{einstein} 
-A.~Einstein (1905). 
-\textit{Zur Elektrodynamik bewegter K{\"o}rper},
-Annalen der Physik, 322 (10), 891--921.
-
 \bibitem{nocedalwright}
 J.~Nocedal \& S.~Wright (2006).
 \textit{Numerical Optimization},
 2nd ed., Springer.
+\bibitem{steiglitz}
+C.~Papadimitriou \& K.~Steiglitz (1982).
+\textit{Combinatorial Optimization: Algorithms and Complexity},
+1st ed., Prentice Hall.
+\bibitem{dantzig}
+G.~Dantzig \& R.~Fulkerson \& S.~Johnson (1954).
+\textit{Solution of a large-scale traveling salesman problem},
+Operations Reseach 2, 393-410.
 \end{thebibliography}
 
 \end{document}
